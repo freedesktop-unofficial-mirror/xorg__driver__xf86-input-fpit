@@ -574,7 +574,7 @@ static InputInfoPtr xf86FpitInit(InputDriverPtr drv, IDevPtr dev, int flags)
 #ifdef XFree86LOADER
 static
 #endif
-InputDriverRec FPIT = {
+_X_EXPORT InputDriverRec FPIT = {
 	1,			/* driver version */
 	"fpit",			/* driver name */
 	NULL,			/* identify */
@@ -605,7 +605,7 @@ static XF86ModuleVersionInfo version_rec = {
  * is setup after the pattern <module_name>ModuleData.
  * Do not change it.
  */
-XF86ModuleData fpitModuleData = {
+_X_EXPORT XF86ModuleData fpitModuleData = {
 	&version_rec, Plug, Unplug
 };
 #endif
