@@ -571,9 +571,6 @@ static InputInfoPtr xf86FpitInit(InputDriverPtr drv, IDevPtr dev, int flags)
 	return local;
 }
 
-#ifdef XFree86LOADER
-static
-#endif
 _X_EXPORT InputDriverRec FPIT = {
 	1,			/* driver version */
 	"fpit",			/* driver name */
