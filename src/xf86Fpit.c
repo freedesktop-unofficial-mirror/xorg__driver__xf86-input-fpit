@@ -51,6 +51,10 @@
  */
 /* $XFree86: xc/programs/Xserver/hw/xfree86/input/fpit/xf86Fpit.c,v 1.6 2004/04/26 22:48:21 dawes Exp $ */
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include <xf86Version.h>
 
 #  ifndef XFree86LOADER
