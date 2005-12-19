@@ -52,11 +52,11 @@ The device supports the following options:
 .RS 8
 .TP 4
 .B Option \fI"MaximumXPosition"\fP \fI"number"\fP
-Sets the maximum X position, use this to callibrate your touchscreen's
+Sets the maximum X position, use this to calibrate your touchscreen's
 right hand edge.
 .TP 4
 .B Option \fI"MinimumXPosition"\fP \fI"number"\fP
-Sets the minimum X position, use this to callibrate your touchscreen's
+Sets the minimum X position, use this to calibrate your touchscreen's
 left hand edge.
 .TP 4
 .B Option \fI"MaximumYPosition"\fP \fI"number"\fP
