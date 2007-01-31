@@ -63,8 +63,6 @@
 
 #  include <misc.h>
 #  include <xf86.h>
-#  if !defined(DGUX)
-#  endif
 #  include <xf86_OSproc.h>
 #  include <xf86Xinput.h>
 #  include <exevents.h>
@@ -79,26 +77,12 @@
  *
  ***************************************************************************
  */
-#define FPIT_LINK_SPEED		B19200	/* 19200 Baud                           */
 #define FPIT_PORT		"/dev/ttyS3"
 
 #define FPIT_MAX_X		4100
 #define FPIT_MIN_X		0
 #define FPIT_MAX_Y		4100
 #define FPIT_MIN_Y		0
-
-#define PHASING_BIT	0x80
-#define PROXIMITY_BIT	0x20 /* DMC: This was 0x40 but the chart says its bit 5 which is 0x20 */
-/*#define TABID_BIT	0x20  */
-#define XSIGN_BIT	0x10
-#define YSIGN_BIT	0x08
-#define BUTTON_BITS	0x07
-#define COORD_BITS	0x7f
-
-/* DMC: Added these */
-#define SW1	0x01
-#define SW2	0x02
-#define SW3	0x04
 
 
 /*
@@ -123,8 +107,6 @@ typedef struct {
 	int screen_width;
 	int screen_height;
 	int screen_no;
-	int fpitInc;		/* increment between transmits */
-	int fpitButTrans;	/* button translation flags */
 	int fpitOldX;		/* previous X position */
 	int fpitOldY;		/* previous Y position */
 	int fpitOldProximity;	/* previous proximity */
@@ -135,10 +117,7 @@ typedef struct {
 	int fpitMaxY;		/* max Y value */
 	int fpitInvX;		/* Invert X axis */
 	int fpitInvY;		/* Invert Y axis */
-	int fpitRes;		/* resolution in lines per inch */
-	int flags;		/* various flags */
 	int fpitIndex;		/* number of bytes read */
-	int fpitBaud;		/* Baud rate of device */
 	unsigned char fpitData[BUFFER_SIZE];	/* data read on the device */
 	int fpitSwapXY;		/* swap X and Y values */
 	int fpitPassive;	/* translate passive buttons */
@@ -209,37 +188,45 @@ static void xf86FpitReadInput(LocalDevicePtr local)
 
 	priv->fpitIndex += len;
 
-	/* process each packet in this block */
-	for (loop=0;loop+FPIT_PACKET_SIZE<=priv->fpitIndex;loop++) { 
-		if (!(priv->fpitData[loop] & 0x80)) continue; /* we don't have a start bit yet */
 
+#define PHASING_BIT	0x80
+#define PROXIMITY_BIT	0x20
+#define BUTTON_BITS	0x07
+#define SW1	0x01
+#define SW2	0x02
+#define SW3	0x04
+
+	/* process each packet in this block */
 /* Format of 5 bytes data packet for Fpit Tablets
      Byte 1
-       bit 7  Phasing bit always 1
-       bit 6  Switch status change
-       bit 5  Proximity
-       bit 4  Always 0
-       bit 3  Test data
-       bit 2  Sw3 (2nd side sw) 
-       bit 1  Sw2 (1st side sw) 
-       bit 0  Sw1 (Pen tip sw) 
+       bit  7   (0x80)  Phasing bit always 1
+       bit  6   (0x40)  Switch status change
+       bit  5   (0x20)  Proximity
+       bit  4   (0x10)  Always 0
+       bit  3   (0x08)  Test data
+       bits 2-0 (0x07)  Buttons:
+       bit  2   (0x04)   Sw3 (2nd side sw) 
+       bit  1   (0x02)   Sw2 (1st side sw) 
+       bit  0   (0x01)   Sw1 (Pen tip sw) 
 
      Byte 2
-       bit 7  Always 0
-       bits 6-0 = X6 - X0
+       bit  7   (0x80)  Always 0
+       bits 6-0 (0x7f)  X6 - X0
 
      Byte 3
-       bit 7  Always 0
-       bits 6-0 = X13 - X7
+       bit  7   (0x80)  Always 0
+       bits 6-0 (0x7f)  X13 - X7
 
      Byte 4
-       bit 7  Always 0
-       bits 6-0 = Y6 - Y0
+       bit  7   (0x80)  Always 0
+       bits 6-0 (0x7f)  Y6 - Y0
 
      Byte 5
-       bit 7  Always 0
-       bits 6-0 = Y13 - Y7
+       bit  7   (0x80)  Always 0
+       bits 6-0 (0x7f)  Y13 - Y7
 */
+	for (loop=0;loop+FPIT_PACKET_SIZE<=priv->fpitIndex;loop++) { 
+		if (!(priv->fpitData[loop] & PHASING_BIT)) continue; /* we don't have a start bit yet */
 
 		x = (int) (priv->fpitData[loop + 1] & 0x7f) + ((int) (priv->fpitData[loop + 2] & 0x7f) << 7);
 		y = (int) (priv->fpitData[loop + 3] & 0x7f) + ((int) (priv->fpitData[loop + 4] & 0x7f) << 7);
@@ -256,7 +243,7 @@ static void xf86FpitReadInput(LocalDevicePtr local)
 		xf86FpitConvert(local, 0, 2, x, y, 0, 0, 0, 0, &conv_x, &conv_y);
 		xf86XInputSetScreen(local, priv->screen_no, conv_x, conv_y);
 
-		/* coordonates are ready we can send events */
+		/* coordinates are ready we can send events */
 
 		if (prox!=priv->fpitOldProximity) /* proximity changed */
 			if (!is_core_pointer) xf86PostProximityEvent(device, prox, 0, 2, x, y);
@@ -268,9 +255,7 @@ static void xf86FpitReadInput(LocalDevicePtr local)
 			/*
 				For passive pen (Stylistic 3400, et al.):
 				sw1 = 1 if pen is moving
-				sw1 = 0 if pen is not moving
-				sw2 = 0 if pen is contacting the pad
-				sw2 = 1 if pen was lifted from the pad
+				sw2 = 1 if pen was lifted from the pad / isn't in contact
 				sw3 = 1 if right mouse-button icon was chosen
 			*/
 			/* convert the pen button bits to actual mouse buttons */
@@ -378,7 +363,7 @@ static Bool xf86FpitControl(DeviceIntPtr dev, int mode)
 			 * screen to fit one meter.
 			 */
 			if (InitValuatorClassDeviceStruct(dev, 2, xf86GetMotionEvents, local->history_size, Absolute) == FALSE) {
-				ErrorF("Unable to allocate Elographics touchscreen ValuatorClassDeviceStruct\n");
+				ErrorF("Unable to allocate Fpit touchscreen ValuatorClassDeviceStruct\n");
 				return !Success;
 			} else {
 				InitValuatorAxisStruct(dev, 0, priv->fpitMinX, priv->fpitMaxX, 9500, 0 /* min_res */ ,
@@ -542,13 +527,13 @@ static InputInfoPtr xf86FpitInit(InputDriverPtr drv, IDevPtr dev, int flags)
 	xf86Msg(X_CONFIG, "FPIT device name: %s\n", local->name);
 	priv->screen_no = xf86SetIntOption(local->options, "ScreenNo", 0);
 	xf86Msg(X_CONFIG, "Fpit associated screen: %d\n", priv->screen_no);
-	priv->fpitMaxX = xf86SetIntOption(local->options, "MaximumXPosition", 4100);
+	priv->fpitMaxX = xf86SetIntOption(local->options, "MaximumXPosition", FPIT_MAX_X);
 	xf86Msg(X_CONFIG, "FPIT maximum x position: %d\n", priv->fpitMaxX);
-	priv->fpitMinX = xf86SetIntOption(local->options, "MinimumXPosition", 0);
+	priv->fpitMinX = xf86SetIntOption(local->options, "MinimumXPosition", FPIT_MIN_X);
 	xf86Msg(X_CONFIG, "FPIT minimum x position: %d\n", priv->fpitMinX);
-	priv->fpitMaxY = xf86SetIntOption(local->options, "MaximumYPosition", 4100);
+	priv->fpitMaxY = xf86SetIntOption(local->options, "MaximumYPosition", FPIT_MAX_Y);
 	xf86Msg(X_CONFIG, "FPIT maximum y position: %d\n", priv->fpitMaxY);
-	priv->fpitMinY = xf86SetIntOption(local->options, "MinimumYPosition", 0);
+	priv->fpitMinY = xf86SetIntOption(local->options, "MinimumYPosition", FPIT_MIN_Y);
 	xf86Msg(X_CONFIG, "FPIT minimum y position: %d\n", priv->fpitMinY);
 	priv->fpitInvX = xf86SetBoolOption(local->options, "InvertX", 0);
 	priv->fpitInvY = xf86SetBoolOption(local->options, "InvertY", 0);
