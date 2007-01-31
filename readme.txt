@@ -78,6 +78,9 @@ Section "InputDevice"
 	Option		"InvertY"
 	# For a passive pen, e.g. Stylistic 3400
 	Option		"Passive"
+	# To make the touchscreen respond automatically to
+	# resolution changes and screen rotation:
+	Option		"TrackRandR"
 EndSection
 
 6. Remember to add this Input Device to the server description (Near the end of the file.)
@@ -141,8 +144,6 @@ Solution:   (Not really a solution) This is a hardware problem.  Some
 Bugs and Needed Work:
 
 (See above)
-
-X rotation (Portrait mode is not supported). -- I plan to add this soon.
 
 Adjusting the constants in the XF86Config(-4) is teedious and requires
 multiple restarts of the X Window system.  -- Somebody PLEASE write a

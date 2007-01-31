@@ -80,6 +80,7 @@ Swap the X and Y axis (after inversions).
 .B Option \fI"Rotate"\fP \fI"CWW"\fP
 Manipulate the invert and swap options to match screen
 rotations. (Will behave strangely if combined with invert or swap options.)
+New users should consider the \fI"TrackRandR"\fP option instead.
 .TP 4
 .B Option \fI"DeviceName"\fP \fI"name"\fP
 .B Option \fI"DeviceName"\fP \fI"name"\fP
@@ -101,6 +102,9 @@ changes the serial link speed.
 .TP 4
 .B Option \fI"Passive"\fP
 decodes the passive pen.
+.B Option \fI"TrackRandR"\fP
+automatically keeps the cursor synchronized with the pen's position, even when
+the screen is resized or rotated. (Recommended for tablet PC's.)
 .RE
 
 Example, for Stylistic LT setup is:
@@ -109,6 +113,7 @@ Example, for Stylistic LT setup is:
 .BI "  Identifier \*q" mouse0 \*q
 .B  "  Driver \*qfpit\*q"
 .BI "  Option \*qDevice\*q   \*q"/dev/ttyS3 \*q
+.BI "  # Option \*qTrackRandR\*q"
 .B EndSection
 .fi
 
@@ -124,6 +129,7 @@ And for other Stylistic devices try:
 .BI "  Option \*qMinimumXPosition\*q \*q"130 \*q
 .BI "  Option \*qMinimumYPosition\*q \*q"0 \*q
 .BI "  Option \*qInvertY\*q"
+.BI "  # Option \*qTrackRandR\*q"
 .B EndSection
 .fi
 
@@ -140,6 +146,7 @@ For Stylistic 3400:
 .BI "  Option \*qMinimumYPosition\*q \*q"0 \*q
 .BI "  Option \*qPassive\*q"
 .BI "  Option \*qSendCoreEvents\*q"
+.BI "  # Option \*qTrackRandR\*q"
 .B EndSection
 .fi
 

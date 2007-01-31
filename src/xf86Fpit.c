@@ -66,6 +66,7 @@
 #  include <xf86_OSproc.h>
 #  include <xf86Xinput.h>
 #  include <exevents.h>
+#  include <randrstr.h>
 
 #  include <xf86Module.h>
 
@@ -98,6 +99,20 @@
 /*
  ***************************************************************************
  *
+ * Screen orientation descriptors.
+ *
+ ***************************************************************************
+ */
+
+typedef enum {
+	FPIT_INVERT_X     = 0x01,
+	FPIT_INVERT_Y     = 0x02,
+	FPIT_THEN_SWAP_XY = 0x04
+} FpitOrientation;
+
+/*
+ ***************************************************************************
+ *
  * Device private records.
  *
  ***************************************************************************
@@ -106,6 +121,7 @@ typedef struct {
 	char *fpitDev;		/* device file name */
 	int screen_width;
 	int screen_height;
+	Rotation screen_rotation;
 	int screen_no;
 	int fpitOldX;		/* previous X position */
 	int fpitOldY;		/* previous Y position */
@@ -115,12 +131,14 @@ typedef struct {
 	int fpitMinY;		/* min Y value */
 	int fpitMaxX;		/* max X value */
 	int fpitMaxY;		/* max Y value */
-	int fpitInvX;		/* Invert X axis */
-	int fpitInvY;		/* Invert Y axis */
 	int fpitIndex;		/* number of bytes read */
 	unsigned char fpitData[BUFFER_SIZE];	/* data read on the device */
-	int fpitSwapXY;		/* swap X and Y values */
+	FpitOrientation fpitBaseOrientation;	/* read from X config */
+	FpitOrientation fpitTotalOrientation;	/* above + RandR */
 	int fpitPassive;	/* translate passive buttons */
+	int fpitTrackRandR;	/* check for, react to screen rotate/resize */
+	/* XXX when this last option is unset, we provide "compatibly stupid"
+	 * behavior. */
 } FpitPrivateRec, *FpitPrivatePtr;
 
 
@@ -139,20 +157,72 @@ typedef struct {
 static Bool xf86FpitConvert(LocalDevicePtr local, int first, int num, int v0, int v1, int v2, int v3, int v4, int v5, int *x, int *y)
 {
 	FpitPrivatePtr priv = (FpitPrivatePtr) local->private;
+	AxisInfoPtr axes = local->dev->valuator->axes;
 	if (first != 0 || num != 2) {
 		return FALSE;
 	}
 
-	if (priv->fpitSwapXY != 0) {
-		*x = xf86ScaleAxis(v1, 0, priv->screen_width, priv->fpitMinY, priv->fpitMaxY);
-		*y = xf86ScaleAxis(v0, 0, priv->screen_height, priv->fpitMinX, priv->fpitMaxX);
-	} else {
-		*x = xf86ScaleAxis(v0, 0, priv->screen_width, priv->fpitMinX, priv->fpitMaxX);
-		*y = xf86ScaleAxis(v1, 0, priv->screen_height, priv->fpitMinY, priv->fpitMaxY);
-	}
+	*x = xf86ScaleAxis(v0, 0, priv->screen_width, axes[0].min_value, axes[0].max_value);
+	*y = xf86ScaleAxis(v1, 0, priv->screen_height, axes[1].min_value, axes[1].max_value);
+
 	return TRUE;
 }
 
+/*
+ ***************************************************************************
+ *
+ * xf86FpitSetUpAxes --
+ *	Based on current screen resolution and, if RandR support is enabled,
+ *	current rotation state, set up the XInput axes and orientation info.
+ *
+ ***************************************************************************
+ */
+
+static void xf86FpitSetUpAxes(DeviceIntPtr dev, FpitPrivatePtr priv)
+{
+	/*
+	 * Device reports motions on 2 axes in absolute coordinates.
+	 * Axes min and max values are reported in raw coordinates.
+	 * Resolution is computed roughly by the difference between
+	 * max and min values scaled from the approximate size of the
+	 * screen to fit one meter.
+	 */
+	int quarter_turns;
+
+	priv->screen_width = screenInfo.screens[priv->screen_no]->width;
+	priv->screen_height = screenInfo.screens[priv->screen_no]->height;
+
+	priv->fpitTotalOrientation = priv->fpitBaseOrientation;
+	if (!priv->fpitTrackRandR)
+		return;
+
+	/* now apply transforms specified by RandR:
+	 * slightly complicated because invertX/Y and swapXY don't commute. */
+	priv->screen_rotation = RRGetRotation(screenInfo.screens[priv->screen_no]);
+	quarter_turns = (
+		(priv->screen_rotation & RR_Rotate_90  ? 1 : 0) +
+		(priv->screen_rotation & RR_Rotate_180 ? 2 : 0) +
+		(priv->screen_rotation & RR_Rotate_270 ? 3 : 0) ) % 4;
+	if (quarter_turns / 2 != 0)
+		priv->fpitTotalOrientation ^= FPIT_INVERT_X | FPIT_INVERT_Y;
+	if (quarter_turns % 2 != 0) {
+		priv->fpitTotalOrientation ^=
+		    (priv->fpitTotalOrientation & FPIT_THEN_SWAP_XY ? FPIT_INVERT_X : FPIT_INVERT_Y)
+		    | FPIT_THEN_SWAP_XY;
+	}
+
+	if (priv->fpitTotalOrientation & FPIT_THEN_SWAP_XY) {
+		InitValuatorAxisStruct(dev, 1, priv->fpitMinX, priv->fpitMaxX, 9500, 0 /* min_res */ ,
+				       9500 /* max_res */ );
+		InitValuatorAxisStruct(dev, 0, priv->fpitMinY, priv->fpitMaxY, 10500, 0 /* min_res */ ,
+				       10500 /* max_res */ );
+	} else {
+		InitValuatorAxisStruct(dev, 0, priv->fpitMinX, priv->fpitMaxX, 9500, 0 /* min_res */ ,
+				       9500 /* max_res */ );
+		InitValuatorAxisStruct(dev, 1, priv->fpitMinY, priv->fpitMaxY, 10500, 0 /* min_res */ ,
+				       10500 /* max_res */ );
+	}
+}
 /*
 ** xf86FpitReadInput
 ** Reads from the Fpit and posts any new events to the server.
@@ -166,6 +236,13 @@ static void xf86FpitReadInput(LocalDevicePtr local)
 	DeviceIntPtr device;
 	int conv_x, conv_y;
 	
+	if (priv->fpitTrackRandR && (
+		priv->screen_width  != screenInfo.screens[priv->screen_no]->width  ||
+		priv->screen_height != screenInfo.screens[priv->screen_no]->height ||
+		priv->screen_rotation != RRGetRotation(screenInfo.screens[priv->screen_no])
+	))
+		xf86FpitSetUpAxes(local->dev, priv);
+
   do { /* keep reading blocks until there are no more */
 
 	/* Read data into buffer */
@@ -230,11 +307,15 @@ static void xf86FpitReadInput(LocalDevicePtr local)
 
 		x = (int) (priv->fpitData[loop + 1] & 0x7f) + ((int) (priv->fpitData[loop + 2] & 0x7f) << 7);
 		y = (int) (priv->fpitData[loop + 3] & 0x7f) + ((int) (priv->fpitData[loop + 4] & 0x7f) << 7);
-		/* Add in any offsets */
-		if (priv->fpitInvX)
+		/* Adjust to orientation */
+		if (priv->fpitTotalOrientation & FPIT_INVERT_X)
 			x = priv->fpitMaxX - x + priv->fpitMinX;
-		if (priv->fpitInvY)
+		if (priv->fpitTotalOrientation & FPIT_INVERT_Y)
 			y = priv->fpitMaxY - y + priv->fpitMinY;
+		if (priv->fpitTotalOrientation & FPIT_THEN_SWAP_XY) {
+			int z = x; x = y; y = z;
+		}
+
 		prox = (priv->fpitData[loop] & PROXIMITY_BIT) ? 0 : 1;
 		buttons = (priv->fpitData[loop] & BUTTON_BITS);
 		device = local->dev;
@@ -334,8 +415,6 @@ static Bool xf86FpitControl(DeviceIntPtr dev, int mode)
 			if (priv->screen_no >= screenInfo.numScreens || priv->screen_no < 0) {
 				priv->screen_no = 0;
 			}
-			priv->screen_width = screenInfo.screens[priv->screen_no]->width;
-			priv->screen_height = screenInfo.screens[priv->screen_no]->height;
 			/*
 			 * Device reports button press for up to 3 buttons.
 			 */
@@ -353,22 +432,11 @@ static Bool xf86FpitControl(DeviceIntPtr dev, int mode)
 				ErrorF("Unable to allocate PtrFeedBackClassDeviceStruct\n");
 			}
 	      
-			/*
-			 * Device reports motions on 2 axes in absolute coordinates.
-			 * Axes min and max values are reported in raw coordinates.
-			 * Resolution is computed roughly by the difference between
-			 * max and min values scaled from the approximate size of the
-			 * screen to fit one meter.
-			 */
 			if (InitValuatorClassDeviceStruct(dev, 2, xf86GetMotionEvents, local->history_size, Absolute) == FALSE) {
 				ErrorF("Unable to allocate Fpit touchscreen ValuatorClassDeviceStruct\n");
 				return !Success;
-			} else {
-				InitValuatorAxisStruct(dev, 0, priv->fpitMinX, priv->fpitMaxX, 9500, 0 /* min_res */ ,
-						       9500 /* max_res */ );
-				InitValuatorAxisStruct(dev, 1, priv->fpitMinY, priv->fpitMaxY, 10500, 0 /* min_res */ ,
-						       10500 /* max_res */ );
 			}
+			xf86FpitSetUpAxes(dev, priv);
 
 			if (InitFocusClassDeviceStruct(dev) == FALSE) {
 				ErrorF("Unable to allocate Fpit touchscreen FocusClassDeviceStruct\n");
@@ -451,6 +519,7 @@ static LocalDevicePtr xf86FpitAllocate(InputDriverPtr drv)
 	priv->screen_no = 0;
 	priv->screen_width = -1;
 	priv->screen_height = -1;
+	priv->screen_rotation = RR_Rotate_0;
 	priv->fpitMinX = FPIT_MIN_X;
 	priv->fpitMaxX = FPIT_MAX_X;
 	priv->fpitMinY = FPIT_MIN_Y;
@@ -459,7 +528,6 @@ static LocalDevicePtr xf86FpitAllocate(InputDriverPtr drv)
 	priv->fpitOldButtons = 0;
 	priv->fpitOldProximity = 0;
 	priv->fpitIndex = 0;
-	priv->fpitSwapXY = 0;
 	priv->fpitPassive = 0;
 	local->name = XI_TOUCHSCREEN;
 	local->flags = 0 /* XI86_NO_OPEN_ON_INIT */ ;
@@ -533,28 +601,32 @@ static InputInfoPtr xf86FpitInit(InputDriverPtr drv, IDevPtr dev, int flags)
 	xf86Msg(X_CONFIG, "FPIT maximum y position: %d\n", priv->fpitMaxY);
 	priv->fpitMinY = xf86SetIntOption(local->options, "MinimumYPosition", FPIT_MIN_Y);
 	xf86Msg(X_CONFIG, "FPIT minimum y position: %d\n", priv->fpitMinY);
-	priv->fpitInvX = xf86SetBoolOption(local->options, "InvertX", 0);
-	priv->fpitInvY = xf86SetBoolOption(local->options, "InvertY", 0);
-	priv->fpitSwapXY = xf86SetBoolOption(local->options, "SwapXY", 0);
+
+	priv->fpitBaseOrientation = 0;
+	if (xf86SetBoolOption(local->options, "InvertX", 0))
+		priv->fpitBaseOrientation |= FPIT_INVERT_X;
+	if (xf86SetBoolOption(local->options, "InvertY", 0))
+		priv->fpitBaseOrientation |= FPIT_INVERT_Y;
+	if (xf86SetBoolOption(local->options, "SwapXY", 0))
+		priv->fpitBaseOrientation |= FPIT_THEN_SWAP_XY;
 	priv->fpitPassive = xf86SetBoolOption(local->options, "Passive", 0);
+	priv->fpitTrackRandR = xf86SetBoolOption(local->options, "TrackRandR", 0);
+	/* XXX "Rotate" option provides compatibly stupid behavior. JEB. */
 	str = xf86SetStrOption(local->options, "Rotate", 0);
-	if (!xf86NameCmp(str, "CW")) {
-		priv->fpitInvX = 1;
-		priv->fpitInvY = 1;
-		priv->fpitSwapXY = 1;
-	} else if (!xf86NameCmp(str, "CCW")) {
-		priv->fpitInvX = 0;
-		priv->fpitInvY = 0;
-		priv->fpitSwapXY = 1;
-	}
-	xf86Msg(X_CONFIG, "FPIT invert X axis: %s\n", priv->fpitInvX ? "Yes" : "No");
-	xf86Msg(X_CONFIG, "FPIT invert Y axis: %s\n", priv->fpitInvY ? "Yes" : "No");
-	xf86Msg(X_CONFIG, "FPIT swap X and Y axis: %s\n", priv->fpitSwapXY ? "Yes" : "No");
+	if (!xf86NameCmp(str, "CW"))
+		priv->fpitBaseOrientation |= FPIT_INVERT_X | FPIT_INVERT_Y | FPIT_THEN_SWAP_XY;
+	else if (!xf86NameCmp(str, "CCW"))
+		priv->fpitBaseOrientation |= FPIT_THEN_SWAP_XY;
+	xf86Msg(X_CONFIG, "FPIT invert X axis: %s\n", priv->fpitBaseOrientation & FPIT_INVERT_X ? "Yes" : "No");
+	xf86Msg(X_CONFIG, "FPIT invert Y axis: %s\n", priv->fpitBaseOrientation & FPIT_INVERT_Y ? "Yes" : "No");
+	xf86Msg(X_CONFIG, "FPIT swap X and Y axis: %s\n", priv->fpitBaseOrientation & FPIT_THEN_SWAP_XY ? "Yes" : "No");
 	xf86Msg(X_CONFIG, "FPIT Passive button mode: %s\n", priv->fpitPassive ? "Yes" : "No");
+	xf86Msg(X_CONFIG, "FPIT RandR tracking: %s\n", priv->fpitTrackRandR ? "Yes" : "No");
 	/* mark the device configured */
 	local->flags |= XI86_CONFIGURED;
 	return local;
 }
+
 
 _X_EXPORT InputDriverRec FPIT = {
 	1,			/* driver version */
