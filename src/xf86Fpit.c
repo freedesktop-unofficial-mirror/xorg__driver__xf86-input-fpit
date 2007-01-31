@@ -262,11 +262,9 @@ static void xf86FpitReadInput(LocalDevicePtr local)
 			if (buttons & SW2) buttons=0; /* the pen was lifted, so no buttons are pressed */
 			else if (buttons & SW3) buttons=SW3; /* the "right mouse" button was pressed, so send down event */
 			else if (prox) buttons=SW1; /* the "left mouse" button was pressed and we are not hovering, so send down event */
-			else buttons=0; /* We are in hover mode, so no buttons */
+			else buttons=0; /* We are in hover mode, so not left-clicking. */
 		}
-		else { /* the active pen's buttons map directly to the mouse buttons */
-			if (!prox) buttons=0; /* We are in hover mode, so no buttons */
-		}
+		/* the active pen's buttons map directly to the mouse buttons. Right-click may happen even in hover mode. */
 	
 		/* DBG(2, ErrorF("%02d/%02d Prox=%d SW:%x Buttons:%x->%x (%d, %d)\n",
 			loop,priv->fpitIndex,prox,priv->fpitData[loop]&BUTTON_BITS,priv->fpitOldButtons,buttons,x,y));*/
