@@ -231,7 +231,7 @@ static void xf86FpitReadInput(LocalDevicePtr local)
 {
 	FpitPrivatePtr priv = (FpitPrivatePtr) local->private;
 	int len, loop;
-	int is_core_pointer;
+	int is_core_pointer = 1;
 	int x, y, buttons, prox;
 	DeviceIntPtr device;
 	int conv_x, conv_y;
@@ -319,7 +319,9 @@ static void xf86FpitReadInput(LocalDevicePtr local)
 		prox = (priv->fpitData[loop] & PROXIMITY_BIT) ? 0 : 1;
 		buttons = (priv->fpitData[loop] & BUTTON_BITS);
 		device = local->dev;
+#if GET_ABI_MAJOR(ABI_XINPUT_VERSION) == 0
 		is_core_pointer = xf86IsCorePointer(device);
+#endif
 
 		xf86FpitConvert(local, 0, 2, x, y, 0, 0, 0, 0, &conv_x, &conv_y);
 		xf86XInputSetScreen(local, priv->screen_no, conv_x, conv_y);
