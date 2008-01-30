@@ -231,7 +231,7 @@ static void xf86FpitReadInput(LocalDevicePtr local)
 {
 	FpitPrivatePtr priv = (FpitPrivatePtr) local->private;
 	int len, loop;
-	int is_core_pointer = 1;
+	int is_core_pointer = 0;
 	int x, y, buttons, prox;
 	DeviceIntPtr device;
 	int conv_x, conv_y;
