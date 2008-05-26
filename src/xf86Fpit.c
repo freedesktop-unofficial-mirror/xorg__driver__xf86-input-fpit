@@ -434,7 +434,11 @@ static Bool xf86FpitControl(DeviceIntPtr dev, int mode)
 				ErrorF("Unable to allocate PtrFeedBackClassDeviceStruct\n");
 			}
 	      
-			if (InitValuatorClassDeviceStruct(dev, 2, xf86GetMotionEvents, local->history_size, Absolute) == FALSE) {
+			if (InitValuatorClassDeviceStruct(dev, 2,
+#if GET_ABI_MAJOR(ABI_XINPUT_VERSION) < 3
+                                    xf86GetMotionEvents,
+#endif
+                                    local->history_size, Absolute) == FALSE) {
 				ErrorF("Unable to allocate Fpit touchscreen ValuatorClassDeviceStruct\n");
 				return !Success;
 			}
