@@ -55,7 +55,7 @@
 #include "config.h"
 #endif
 
-#include <xf86Version.h>
+#include <xorgVersion.h>
 
 #include <unistd.h>
 #include <errno.h>
