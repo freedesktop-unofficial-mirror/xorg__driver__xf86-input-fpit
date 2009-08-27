@@ -589,8 +589,7 @@ static void xf86FpitUninit(InputDriverPtr drv, LocalDevicePtr local, int flags)
 	xf86FpitControl(local->dev, DEVICE_OFF);
 	xfree(priv->fpitDev);
 	xfree(priv);
-	xfree(local->name);
-	xfree(local);
+	local->private = NULL;
 	xf86DeleteInput(local, 0);
 }
 
