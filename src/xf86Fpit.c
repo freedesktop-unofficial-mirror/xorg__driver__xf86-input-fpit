@@ -232,7 +232,7 @@ static void xf86FpitSetUpAxes(DeviceIntPtr dev, FpitPrivatePtr priv)
 #if GET_ABI_MAJOR(ABI_XINPUT_VERSION) >= 7
 				       axis_labels[0],
 #endif
-				       priv->fpitMinY, priv->fpitMaxY, 9500, 0 /* min_res */ ,
+				       priv->fpitMinX, priv->fpitMaxX, 9500, 0 /* min_res */ ,
 				       9500 /* max_res */ );
 		InitValuatorAxisStruct(dev, 1,
 #if GET_ABI_MAJOR(ABI_XINPUT_VERSION) >= 7
