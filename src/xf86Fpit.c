@@ -69,6 +69,9 @@
 
 #  include <xf86Module.h>
 
+#if GET_ABI_MAJOR(ABI_XINPUT_VERSION) < 12
+#error "Need a server with input ABI 12"
+#endif
 
 /*
  ***************************************************************************
@@ -214,17 +217,17 @@ static void xf86FpitSetUpAxes(DeviceIntPtr dev, FpitPrivatePtr priv)
 	if (priv->fpitTotalOrientation & FPIT_THEN_SWAP_XY) {
 		InitValuatorAxisStruct(dev, 1, axis_labels[1],
 				       priv->fpitMinX, priv->fpitMaxX, 9500, 0 /* min_res */ ,
-				       9500 /* max_res */ );
+				       9500 /* max_res */, Absolute);
 		InitValuatorAxisStruct(dev, 0, axis_labels[0],
 				       priv->fpitMinY, priv->fpitMaxY, 10500, 0 /* min_res */ ,
-				       10500 /* max_res */ );
+				       10500 /* max_res */, Absolute);
 	} else {
 		InitValuatorAxisStruct(dev, 0, axis_labels[0],
 				       priv->fpitMinX, priv->fpitMaxX, 9500, 0 /* min_res */ ,
-				       9500 /* max_res */ );
+				       9500 /* max_res */, Absolute);
 		InitValuatorAxisStruct(dev, 1, axis_labels[1],
 				       priv->fpitMinY, priv->fpitMaxY, 10500, 0 /* min_res */ ,
-				       10500 /* max_res */ );
+				       10500 /* max_res */, Absolute);
 	}
 }
 /*
@@ -507,18 +510,12 @@ static Bool xf86FpitControl(DeviceIntPtr dev, int mode)
  *
  ***************************************************************************
  */
-static InputInfoPtr xf86FpitAllocate(InputDriverPtr drv)
+static int xf86FpitAllocate(InputDriverPtr drv, InputInfoPtr pInfo)
 {
-	InputInfoPtr pInfo;
 	FpitPrivatePtr priv;
 	priv = malloc(sizeof(FpitPrivateRec));
 	if (!priv)
-		return NULL;
-	pInfo = xf86AllocateInput(drv, 0);
-	if (!pInfo) {
-		free(priv);
-		return NULL;
-	}
+		return BadAlloc;
 
 	priv->fpitDev = strdup(FPIT_PORT);
 	priv->screen_no = 0;
@@ -541,11 +538,10 @@ static InputInfoPtr xf86FpitAllocate(InputDriverPtr drv)
 	pInfo->control_proc = NULL;
 	pInfo->switch_mode = NULL;
 	pInfo->fd = -1;
-	pInfo->atom = 0;
 	pInfo->dev = NULL;
 	pInfo->private = priv;
 	pInfo->type_name = "Fujitsu Stylistic";
-	return pInfo;
+	return Success;
 }
 
 static void xf86FpitUninit(InputDriverPtr drv, InputInfoPtr pInfo, int flags)
@@ -558,35 +554,31 @@ static void xf86FpitUninit(InputDriverPtr drv, InputInfoPtr pInfo, int flags)
 	xf86DeleteInput(pInfo, 0);
 }
 
-static const char *default_options[] = {
+static char *default_options[] = {
 	"BaudRate", "19200", "StopBits", "0", "DataBits", "8", "Parity", "None", "Vmin", "10", "Vtime", "1", "FlowControl", "None", NULL
 };
 
-static InputInfoPtr xf86FpitInit(InputDriverPtr drv, IDevPtr dev, int flags)
+static int xf86FpitInit(InputDriverPtr drv, InputInfoPtr pInfo, int flags)
 {
-	InputInfoPtr pInfo = NULL;
 	FpitPrivatePtr priv = NULL;
 	char *str;
+        int rc;
 
-	pInfo = xf86FpitAllocate(drv);
-	if (!pInfo)
-		return NULL;
+	rc = xf86FpitAllocate(drv, pInfo);
+	if (rc != Success)
+		return rc;
 
 	priv = pInfo->private;
-	pInfo->conf_idev = dev;
-	xf86CollectInputOptions(pInfo, default_options, NULL);
-	/* Process the common options. */
-	xf86ProcessCommonOptions(pInfo, pInfo->options);
 	str = xf86FindOptionValue(pInfo->options, "Device");
 	if (!str) {
-		xf86Msg(X_ERROR, "%s: No Device specified in FPIT module config.\n", dev->identifier);
+		xf86Msg(X_ERROR, "%s: No Device specified in FPIT module config.\n", pInfo->name);
 		if (priv) {
 			if (priv->fpitDev) {
 				free(priv->fpitDev);
 			}
 			free(priv);
 		}
-		return pInfo;
+		return BadValue;
 	}
 	priv->fpitDev = strdup(str);
 	pInfo->name = xf86SetStrOption(pInfo->options, "DeviceName", XI_TOUCHSCREEN);
@@ -622,9 +614,7 @@ static InputInfoPtr xf86FpitInit(InputDriverPtr drv, IDevPtr dev, int flags)
 	xf86Msg(X_CONFIG, "FPIT swap X and Y axis: %s\n", priv->fpitBaseOrientation & FPIT_THEN_SWAP_XY ? "Yes" : "No");
 	xf86Msg(X_CONFIG, "FPIT Passive button mode: %s\n", priv->fpitPassive ? "Yes" : "No");
 	xf86Msg(X_CONFIG, "FPIT RandR tracking: %s\n", priv->fpitTrackRandR ? "Yes" : "No");
-	/* mark the device configured */
-	pInfo->flags |= XI86_CONFIGURED;
-	return pInfo;
+	return Success;
 }
 
 
@@ -635,6 +625,7 @@ _X_EXPORT InputDriverRec FPIT = {
 	xf86FpitInit,		/* pre-init */
 	xf86FpitUninit,		/* un-init */
 	NULL,			/* module */
+	default_options
 };
 
 static pointer Plug(pointer module, pointer options, int *errmaj, int *errmin)
