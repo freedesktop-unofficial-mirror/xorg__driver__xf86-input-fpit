@@ -153,10 +153,10 @@ typedef struct {
  *
  ***************************************************************************
  */
-static Bool xf86FpitConvert(LocalDevicePtr local, int first, int num, int v0, int v1, int v2, int v3, int v4, int v5, int *x, int *y)
+static Bool xf86FpitConvert(InputInfoPtr pInfo, int first, int num, int v0, int v1, int v2, int v3, int v4, int v5, int *x, int *y)
 {
-	FpitPrivatePtr priv = (FpitPrivatePtr) local->private;
-	AxisInfoPtr axes = local->dev->valuator->axes;
+	FpitPrivatePtr priv = (FpitPrivatePtr) pInfo->private;
+	AxisInfoPtr axes = pInfo->dev->valuator->axes;
 	if (first != 0 || num != 2) {
 		return FALSE;
 	}
@@ -245,9 +245,9 @@ static void xf86FpitSetUpAxes(DeviceIntPtr dev, FpitPrivatePtr priv)
 ** xf86FpitReadInput
 ** Reads from the Fpit and posts any new events to the server.
 */
-static void xf86FpitReadInput(LocalDevicePtr local)
+static void xf86FpitReadInput(InputInfoPtr pInfo)
 {
-	FpitPrivatePtr priv = (FpitPrivatePtr) local->private;
+	FpitPrivatePtr priv = (FpitPrivatePtr) pInfo->private;
 	int len, loop;
 	int is_core_pointer = 0;
 	int x, y, buttons, prox;
@@ -259,12 +259,12 @@ static void xf86FpitReadInput(LocalDevicePtr local)
 		priv->screen_height != screenInfo.screens[priv->screen_no]->height ||
 		priv->screen_rotation != RRGetRotation(screenInfo.screens[priv->screen_no])
 	))
-		xf86FpitSetUpAxes(local->dev, priv);
+		xf86FpitSetUpAxes(pInfo->dev, priv);
 
   do { /* keep reading blocks until there are no more */
 
 	/* Read data into buffer */
-	len = xf86ReadSerial(local->fd, priv->fpitData+priv->fpitIndex, BUFFER_SIZE-priv->fpitIndex);
+	len = xf86ReadSerial(pInfo->fd, priv->fpitData+priv->fpitIndex, BUFFER_SIZE-priv->fpitIndex);
 	if (len <= 0) {
 		Error("error reading FPIT device");
 		priv->fpitIndex = 0;
@@ -336,13 +336,13 @@ static void xf86FpitReadInput(LocalDevicePtr local)
 
 		prox = (priv->fpitData[loop] & PROXIMITY_BIT) ? 0 : 1;
 		buttons = (priv->fpitData[loop] & BUTTON_BITS);
-		device = local->dev;
+		device = pInfo->dev;
 #if GET_ABI_MAJOR(ABI_XINPUT_VERSION) == 0
 		is_core_pointer = xf86IsCorePointer(device);
 #endif
 
-		xf86FpitConvert(local, 0, 2, x, y, 0, 0, 0, 0, &conv_x, &conv_y);
-		xf86XInputSetScreen(local, priv->screen_no, conv_x, conv_y);
+		xf86FpitConvert(pInfo, 0, 2, x, y, 0, 0, 0, 0, &conv_x, &conv_y);
+		xf86XInputSetScreen(pInfo, priv->screen_no, conv_x, conv_y);
 
 		/* coordinates are ready we can send events */
 
@@ -398,7 +398,7 @@ static void xf86FpitReadInput(LocalDevicePtr local)
 			I had lifted the pen. So I am checking the device for more data
 			and then retrieving it. This fixed it for me. I don't know if this is just my system. */
 
-  } while (xf86WaitForInput(local->fd,0)>0); /* go back and check for more data (we don't want to block for I/O!) */
+  } while (xf86WaitForInput(pInfo->fd,0)>0); /* go back and check for more data (we don't want to block for I/O!) */
 
 	return;
 }
@@ -421,8 +421,8 @@ static void xf86FpitPtrCtrl(DeviceIntPtr device, PtrCtrl *ctrl)
  */
 static Bool xf86FpitControl(DeviceIntPtr dev, int mode)
 {
-	LocalDevicePtr local = (LocalDevicePtr) dev->public.devicePrivate;
-	FpitPrivatePtr priv = (FpitPrivatePtr) (local->private);
+	InputInfoPtr pInfo = (InputInfoPtr) dev->public.devicePrivate;
+	FpitPrivatePtr priv = (FpitPrivatePtr) (pInfo->private);
 	unsigned char map[] = {
 		0, 1, 2, 3 /* DMC: changed this so we can use all three buttons */
 	};
@@ -467,7 +467,7 @@ static Bool xf86FpitControl(DeviceIntPtr dev, int mode)
 #if GET_ABI_MAJOR(ABI_XINPUT_VERSION) < 3
                                     xf86GetMotionEvents,
 #endif
-                                    local->history_size, Absolute) == FALSE) {
+                                    pInfo->history_size, Absolute) == FALSE) {
 				ErrorF("Unable to allocate Fpit touchscreen ValuatorClassDeviceStruct\n");
 				return !Success;
 			}
@@ -479,7 +479,7 @@ static Bool xf86FpitControl(DeviceIntPtr dev, int mode)
 			/*
 			 * Allocate the motion events buffer.
 			 */
-			xf86MotionHistoryAllocate(local);
+			xf86MotionHistoryAllocate(pInfo);
 			/*
 			 * This once has caused the server to crash after doing an xalloc & strcpy ??
 			 */
@@ -487,14 +487,14 @@ static Bool xf86FpitControl(DeviceIntPtr dev, int mode)
 		}
 
 	case DEVICE_ON:
-		if (local->fd < 0) {
-			local->fd = xf86OpenSerial(local->options);
-			if (local->fd < 0) {
+		if (pInfo->fd < 0) {
+			pInfo->fd = xf86OpenSerial(pInfo->options);
+			if (pInfo->fd < 0) {
 				Error("Unable to open Fpit touchscreen device");
 				return !Success;
 			}
 
-			xf86AddEnabledDevice(local);
+			xf86AddEnabledDevice(pInfo);
 			dev->public.on = TRUE;
 		}
 		return Success;
@@ -506,11 +506,11 @@ static Bool xf86FpitControl(DeviceIntPtr dev, int mode)
 		 */
 	case DEVICE_OFF:
 		dev->public.on = FALSE;
-		if (local->fd >= 0) {
-			xf86RemoveEnabledDevice(local);
+		if (pInfo->fd >= 0) {
+			xf86RemoveEnabledDevice(pInfo);
 		}
-		xf86CloseSerial(local->fd);
-		local->fd = -1;
+		xf86CloseSerial(pInfo->fd);
+		pInfo->fd = -1;
 		return Success;
 		/*
 		 * Final close before server exit. This is used during server shutdown.
@@ -518,11 +518,11 @@ static Bool xf86FpitControl(DeviceIntPtr dev, int mode)
 		 */
 	case DEVICE_CLOSE:
 		dev->public.on = FALSE;
-		if (local->fd >= 0) {
-			RemoveEnabledDevice(local->fd);
+		if (pInfo->fd >= 0) {
+			RemoveEnabledDevice(pInfo->fd);
 		}
-		xf86CloseSerial(local->fd);
-		local->fd = -1;
+		xf86CloseSerial(pInfo->fd);
+		pInfo->fd = -1;
 		return Success;
 	default:
 		ErrorF("unsupported mode=%d\n", mode);
@@ -537,15 +537,15 @@ static Bool xf86FpitControl(DeviceIntPtr dev, int mode)
  *
  ***************************************************************************
  */
-static LocalDevicePtr xf86FpitAllocate(InputDriverPtr drv)
+static InputInfoPtr xf86FpitAllocate(InputDriverPtr drv)
 {
-	LocalDevicePtr local;
+	InputInfoPtr pInfo;
 	FpitPrivatePtr priv;
 	priv = xalloc(sizeof(FpitPrivateRec));
 	if (!priv)
 		return NULL;
-	local = xf86AllocateInput(drv, 0);
-	if (!local) {
+	pInfo = xf86AllocateInput(drv, 0);
+	if (!pInfo) {
 		xfree(priv);
 		return NULL;
 	}
@@ -564,32 +564,32 @@ static LocalDevicePtr xf86FpitAllocate(InputDriverPtr drv)
 	priv->fpitOldProximity = 0;
 	priv->fpitIndex = 0;
 	priv->fpitPassive = 0;
-	local->name = XI_TOUCHSCREEN;
-	local->flags = 0 /* XI86_NO_OPEN_ON_INIT */ ;
-	local->device_control = xf86FpitControl;
-	local->read_input = xf86FpitReadInput;
-	local->control_proc = NULL;
-	local->close_proc = NULL;
-	local->switch_mode = NULL;
-	local->conversion_proc = xf86FpitConvert;
-	local->reverse_conversion_proc = NULL;
-	local->fd = -1;
-	local->atom = 0;
-	local->dev = NULL;
-	local->private = priv;
-	local->type_name = "Fujitsu Stylistic";
-	local->history_size = 0;
-	return local;
+	pInfo->name = XI_TOUCHSCREEN;
+	pInfo->flags = 0 /* XI86_NO_OPEN_ON_INIT */ ;
+	pInfo->device_control = xf86FpitControl;
+	pInfo->read_input = xf86FpitReadInput;
+	pInfo->control_proc = NULL;
+	pInfo->close_proc = NULL;
+	pInfo->switch_mode = NULL;
+	pInfo->conversion_proc = xf86FpitConvert;
+	pInfo->reverse_conversion_proc = NULL;
+	pInfo->fd = -1;
+	pInfo->atom = 0;
+	pInfo->dev = NULL;
+	pInfo->private = priv;
+	pInfo->type_name = "Fujitsu Stylistic";
+	pInfo->history_size = 0;
+	return pInfo;
 }
 
-static void xf86FpitUninit(InputDriverPtr drv, LocalDevicePtr local, int flags)
+static void xf86FpitUninit(InputDriverPtr drv, InputInfoPtr pInfo, int flags)
 {
-	FpitPrivatePtr priv = (FpitPrivatePtr) local->private;
-	xf86FpitControl(local->dev, DEVICE_OFF);
+	FpitPrivatePtr priv = (FpitPrivatePtr) pInfo->private;
+	xf86FpitControl(pInfo->dev, DEVICE_OFF);
 	xfree(priv->fpitDev);
 	xfree(priv);
-	local->private = NULL;
-	xf86DeleteInput(local, 0);
+	pInfo->private = NULL;
+	xf86DeleteInput(pInfo, 0);
 }
 
 static const char *default_options[] = {
@@ -598,20 +598,20 @@ static const char *default_options[] = {
 
 static InputInfoPtr xf86FpitInit(InputDriverPtr drv, IDevPtr dev, int flags)
 {
-	LocalDevicePtr local = NULL;
+	InputInfoPtr pInfo = NULL;
 	FpitPrivatePtr priv = NULL;
 	char *str;
 
-	local = xf86FpitAllocate(drv);
-	if (!local)
+	pInfo = xf86FpitAllocate(drv);
+	if (!pInfo)
 		return NULL;
 
-	priv = local->private;
-	local->conf_idev = dev;
-	xf86CollectInputOptions(local, default_options, NULL);
+	priv = pInfo->private;
+	pInfo->conf_idev = dev;
+	xf86CollectInputOptions(pInfo, default_options, NULL);
 	/* Process the common options. */
-	xf86ProcessCommonOptions(local, local->options);
-	str = xf86FindOptionValue(local->options, "Device");
+	xf86ProcessCommonOptions(pInfo, pInfo->options);
+	str = xf86FindOptionValue(pInfo->options, "Device");
 	if (!str) {
 		xf86Msg(X_ERROR, "%s: No Device specified in FPIT module config.\n", dev->identifier);
 		if (priv) {
@@ -620,33 +620,33 @@ static InputInfoPtr xf86FpitInit(InputDriverPtr drv, IDevPtr dev, int flags)
 			}
 			xfree(priv);
 		}
-		return local;
+		return pInfo;
 	}
 	priv->fpitDev = strdup(str);
-	local->name = xf86SetStrOption(local->options, "DeviceName", XI_TOUCHSCREEN);
-	xf86Msg(X_CONFIG, "FPIT device name: %s\n", local->name);
-	priv->screen_no = xf86SetIntOption(local->options, "ScreenNo", 0);
+	pInfo->name = xf86SetStrOption(pInfo->options, "DeviceName", XI_TOUCHSCREEN);
+	xf86Msg(X_CONFIG, "FPIT device name: %s\n", pInfo->name);
+	priv->screen_no = xf86SetIntOption(pInfo->options, "ScreenNo", 0);
 	xf86Msg(X_CONFIG, "Fpit associated screen: %d\n", priv->screen_no);
-	priv->fpitMaxX = xf86SetIntOption(local->options, "MaximumXPosition", FPIT_MAX_X);
+	priv->fpitMaxX = xf86SetIntOption(pInfo->options, "MaximumXPosition", FPIT_MAX_X);
 	xf86Msg(X_CONFIG, "FPIT maximum x position: %d\n", priv->fpitMaxX);
-	priv->fpitMinX = xf86SetIntOption(local->options, "MinimumXPosition", FPIT_MIN_X);
+	priv->fpitMinX = xf86SetIntOption(pInfo->options, "MinimumXPosition", FPIT_MIN_X);
 	xf86Msg(X_CONFIG, "FPIT minimum x position: %d\n", priv->fpitMinX);
-	priv->fpitMaxY = xf86SetIntOption(local->options, "MaximumYPosition", FPIT_MAX_Y);
+	priv->fpitMaxY = xf86SetIntOption(pInfo->options, "MaximumYPosition", FPIT_MAX_Y);
 	xf86Msg(X_CONFIG, "FPIT maximum y position: %d\n", priv->fpitMaxY);
-	priv->fpitMinY = xf86SetIntOption(local->options, "MinimumYPosition", FPIT_MIN_Y);
+	priv->fpitMinY = xf86SetIntOption(pInfo->options, "MinimumYPosition", FPIT_MIN_Y);
 	xf86Msg(X_CONFIG, "FPIT minimum y position: %d\n", priv->fpitMinY);
 
 	priv->fpitBaseOrientation = 0;
-	if (xf86SetBoolOption(local->options, "InvertX", 0))
+	if (xf86SetBoolOption(pInfo->options, "InvertX", 0))
 		priv->fpitBaseOrientation |= FPIT_INVERT_X;
-	if (xf86SetBoolOption(local->options, "InvertY", 0))
+	if (xf86SetBoolOption(pInfo->options, "InvertY", 0))
 		priv->fpitBaseOrientation |= FPIT_INVERT_Y;
-	if (xf86SetBoolOption(local->options, "SwapXY", 0))
+	if (xf86SetBoolOption(pInfo->options, "SwapXY", 0))
 		priv->fpitBaseOrientation |= FPIT_THEN_SWAP_XY;
-	priv->fpitPassive = xf86SetBoolOption(local->options, "Passive", 0);
-	priv->fpitTrackRandR = xf86SetBoolOption(local->options, "TrackRandR", 0);
+	priv->fpitPassive = xf86SetBoolOption(pInfo->options, "Passive", 0);
+	priv->fpitTrackRandR = xf86SetBoolOption(pInfo->options, "TrackRandR", 0);
 	/* XXX "Rotate" option provides compatibly stupid behavior. JEB. */
-	str = xf86SetStrOption(local->options, "Rotate", 0);
+	str = xf86SetStrOption(pInfo->options, "Rotate", 0);
 	if (!xf86NameCmp(str, "CW"))
 		priv->fpitBaseOrientation |= FPIT_INVERT_X | FPIT_INVERT_Y | FPIT_THEN_SWAP_XY;
 	else if (!xf86NameCmp(str, "CCW"))
@@ -657,8 +657,8 @@ static InputInfoPtr xf86FpitInit(InputDriverPtr drv, IDevPtr dev, int flags)
 	xf86Msg(X_CONFIG, "FPIT Passive button mode: %s\n", priv->fpitPassive ? "Yes" : "No");
 	xf86Msg(X_CONFIG, "FPIT RandR tracking: %s\n", priv->fpitTrackRandR ? "Yes" : "No");
 	/* mark the device configured */
-	local->flags |= XI86_CONFIGURED;
-	return local;
+	pInfo->flags |= XI86_CONFIGURED;
+	return pInfo;
 }
 
 
