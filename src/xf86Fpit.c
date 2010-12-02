@@ -671,7 +671,6 @@ _X_EXPORT InputDriverRec FPIT = {
 	NULL,			/* module */
 };
 
-#ifdef XFree86LOADER
 static pointer Plug(pointer module, pointer options, int *errmaj, int *errmin)
 {
 	xf86AddInputDriver(&FPIT, module, 0);
@@ -703,4 +702,3 @@ static XF86ModuleVersionInfo version_rec = {
 _X_EXPORT XF86ModuleData fpitModuleData = {
 	&version_rec, Plug, Unplug
 };
-#endif
