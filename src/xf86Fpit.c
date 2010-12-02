@@ -437,7 +437,7 @@ static Bool xf86FpitControl(DeviceIntPtr dev, int mode)
 			}
 
 			if (InitValuatorClassDeviceStruct(dev, 2, axis_labels,
-                                                          pInfo->history_size, Absolute) == FALSE) {
+                                                          GetMotionHistorySize(), Absolute) == FALSE) {
 				ErrorF("Unable to allocate Fpit touchscreen ValuatorClassDeviceStruct\n");
 				return !Success;
 			}
@@ -545,7 +545,6 @@ static InputInfoPtr xf86FpitAllocate(InputDriverPtr drv)
 	pInfo->dev = NULL;
 	pInfo->private = priv;
 	pInfo->type_name = "Fujitsu Stylistic";
-	pInfo->history_size = 0;
 	return pInfo;
 }
 
