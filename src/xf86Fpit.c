@@ -669,7 +669,6 @@ _X_EXPORT InputDriverRec FPIT = {
 	xf86FpitInit,		/* pre-init */
 	xf86FpitUninit,		/* un-init */
 	NULL,			/* module */
-	0			/* ref count */
 };
 
 #ifdef XFree86LOADER
