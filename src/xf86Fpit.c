@@ -569,10 +569,7 @@ static InputInfoPtr xf86FpitAllocate(InputDriverPtr drv)
 	pInfo->device_control = xf86FpitControl;
 	pInfo->read_input = xf86FpitReadInput;
 	pInfo->control_proc = NULL;
-	pInfo->close_proc = NULL;
 	pInfo->switch_mode = NULL;
-	pInfo->conversion_proc = xf86FpitConvert;
-	pInfo->reverse_conversion_proc = NULL;
 	pInfo->fd = -1;
 	pInfo->atom = 0;
 	pInfo->dev = NULL;
