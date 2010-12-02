@@ -481,7 +481,7 @@ static Bool xf86FpitControl(DeviceIntPtr dev, int mode)
 			 */
 			xf86MotionHistoryAllocate(pInfo);
 			/*
-			 * This once has caused the server to crash after doing an xalloc & strcpy ??
+			 * This once has caused the server to crash after doing a malloc & strcpy ??
 			 */
 			return Success;
 		}
@@ -541,12 +541,12 @@ static InputInfoPtr xf86FpitAllocate(InputDriverPtr drv)
 {
 	InputInfoPtr pInfo;
 	FpitPrivatePtr priv;
-	priv = xalloc(sizeof(FpitPrivateRec));
+	priv = malloc(sizeof(FpitPrivateRec));
 	if (!priv)
 		return NULL;
 	pInfo = xf86AllocateInput(drv, 0);
 	if (!pInfo) {
-		xfree(priv);
+		free(priv);
 		return NULL;
 	}
 
@@ -583,8 +583,8 @@ static void xf86FpitUninit(InputDriverPtr drv, InputInfoPtr pInfo, int flags)
 {
 	FpitPrivatePtr priv = (FpitPrivatePtr) pInfo->private;
 	xf86FpitControl(pInfo->dev, DEVICE_OFF);
-	xfree(priv->fpitDev);
-	xfree(priv);
+	free(priv->fpitDev);
+	free(priv);
 	pInfo->private = NULL;
 	xf86DeleteInput(pInfo, 0);
 }
@@ -613,9 +613,9 @@ static InputInfoPtr xf86FpitInit(InputDriverPtr drv, IDevPtr dev, int flags)
 		xf86Msg(X_ERROR, "%s: No Device specified in FPIT module config.\n", dev->identifier);
 		if (priv) {
 			if (priv->fpitDev) {
-				xfree(priv->fpitDev);
+				free(priv->fpitDev);
 			}
-			xfree(priv);
+			free(priv);
 		}
 		return pInfo;
 	}
