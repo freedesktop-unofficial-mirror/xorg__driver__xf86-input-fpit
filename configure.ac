@@ -51,6 +51,16 @@ AC_ARG_WITH(xorg-module-dir,
 inputdir=${moduledir}/input
 AC_SUBST(inputdir)
 
+# Define a configure option for an alternate X Server configuration directory
+sysconfigdir=`$PKG_CONFIG --variable=sysconfigdir xorg-server`
+AC_ARG_WITH(xorg-conf-dir,
+            AC_HELP_STRING([--with-xorg-conf-dir=DIR],
+                           [Default xorg.conf.d directory [[default=from $PKG_CONFIG xorg-server]]]),
+            [configdir="$withval"],
+            [configdir="$sysconfigdir"])
+AC_SUBST(configdir)
+AM_CONDITIONAL(HAS_XORG_CONF_DIR, [test "x$sysconfigdir" != "x"])
+
 # Checks for extensions
 XORG_DRIVER_CHECK_EXT(RANDR, randrproto)
 XORG_DRIVER_CHECK_EXT(XINPUT, inputproto)
@@ -61,4 +71,4 @@ PKG_CHECK_MODULES(XORG, [xorg-server >= 1.10.0] xproto $REQUIRED_MODULES)
 DRIVER_NAME=fpit
 AC_SUBST([DRIVER_NAME])
 
-AC_OUTPUT([Makefile src/Makefile man/Makefile])
+AC_OUTPUT([Makefile src/Makefile man/Makefile conf/Makefile])
