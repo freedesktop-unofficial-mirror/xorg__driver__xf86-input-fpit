@@ -54,7 +54,7 @@
 #include "config.h"
 #endif
 
-#include <xorgVersion.h>
+#include <xorg-server.h>
 
 #include <unistd.h>
 #include <errno.h>
