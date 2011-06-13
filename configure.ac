@@ -57,8 +57,8 @@ AC_SUBST(inputdir)
 XORG_DRIVER_CHECK_EXT(RANDR, randrproto)
 XORG_DRIVER_CHECK_EXT(XINPUT, inputproto)
 
-# Checks for pkg-config packages
-PKG_CHECK_MODULES(XORG, [xorg-server >= 1.9.0] xproto $REQUIRED_MODULES)
+# Obtain compiler/linker options for the fpit driver dependencies
+PKG_CHECK_MODULES(XORG, [xorg-server >= 1.10.0] xproto $REQUIRED_MODULES)
 sdkdir=$(pkg-config --variable=sdkdir xorg-server)
 XORG_CFLAGS="$CWARNFLAGS $XORG_CFLAGS"
 
