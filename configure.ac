@@ -57,8 +57,6 @@ XORG_DRIVER_CHECK_EXT(XINPUT, inputproto)
 
 # Obtain compiler/linker options for the fpit driver dependencies
 PKG_CHECK_MODULES(XORG, [xorg-server >= 1.10.0] xproto $REQUIRED_MODULES)
-sdkdir=$(pkg-config --variable=sdkdir xorg-server)
-AC_SUBST([sdkdir])
 
 DRIVER_NAME=fpit
 AC_SUBST([DRIVER_NAME])
