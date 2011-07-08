@@ -82,10 +82,6 @@ Manipulate the invert and swap options to match screen
 rotations. (Will behave strangely if combined with invert or swap options.)
 New users should consider the \fI"TrackRandR"\fP option instead.
 .TP 4
-.B Option \fI"DeviceName"\fP \fI"name"\fP
-.B Option \fI"DeviceName"\fP \fI"name"\fP
-sets the name of the X device.
-.TP 4
 .B Option \fI"AlwaysCore"\fP \fI"on"\fP
 enables the sharing of the core pointer. When this feature is enabled, the
 device will take control of the core pointer (and thus will emit core events)

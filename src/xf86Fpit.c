@@ -527,7 +527,6 @@ static int xf86FpitAllocate(InputDriverPtr drv, InputInfoPtr pInfo)
 	priv->fpitOldProximity = 0;
 	priv->fpitIndex = 0;
 	priv->fpitPassive = 0;
-	pInfo->name = XI_TOUCHSCREEN;
 	pInfo->flags = 0 /* XI86_NO_OPEN_ON_INIT */ ;
 	pInfo->device_control = xf86FpitControl;
 	pInfo->read_input = xf86FpitReadInput;
@@ -536,7 +535,7 @@ static int xf86FpitAllocate(InputDriverPtr drv, InputInfoPtr pInfo)
 	pInfo->fd = -1;
 	pInfo->dev = NULL;
 	pInfo->private = priv;
-	pInfo->type_name = "Fujitsu Stylistic";
+	pInfo->type_name = XI_TOUCHSCREEN;
 	return Success;
 }
 
@@ -577,8 +576,6 @@ static int xf86FpitInit(InputDriverPtr drv, InputInfoPtr pInfo, int flags)
 		return BadValue;
 	}
 	priv->fpitDev = strdup(str);
-	pInfo->name = xf86SetStrOption(pInfo->options, "DeviceName", XI_TOUCHSCREEN);
-	xf86Msg(X_CONFIG, "FPIT device name: %s\n", pInfo->name);
 	priv->screen_no = xf86SetIntOption(pInfo->options, "ScreenNo", 0);
 	xf86Msg(X_CONFIG, "Fpit associated screen: %d\n", priv->screen_no);
 	priv->fpitMaxX = xf86SetIntOption(pInfo->options, "MaximumXPosition", FPIT_MAX_X);
