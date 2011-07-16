@@ -495,7 +495,7 @@ static Bool xf86FpitControl(DeviceIntPtr dev, int mode)
 		return Success;
 	default:
 		ErrorF("unsupported mode=%d\n", mode);
-		return !Success;
+		return BadValue;
 	}
 }
 
