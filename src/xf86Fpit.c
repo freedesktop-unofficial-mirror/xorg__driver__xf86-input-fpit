@@ -567,12 +567,6 @@ static int xf86FpitInit(InputDriverPtr drv, InputInfoPtr pInfo, int flags)
 	str = xf86FindOptionValue(pInfo->options, "Device");
 	if (!str) {
 		xf86Msg(X_ERROR, "%s: No Device specified in FPIT module config.\n", pInfo->name);
-		if (priv) {
-			if (priv->fpitDev) {
-				free(priv->fpitDev);
-			}
-			free(priv);
-		}
 		return BadValue;
 	}
 	priv->fpitDev = strdup(str);
