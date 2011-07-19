@@ -568,6 +568,14 @@ static int xf86FpitInit(InputDriverPtr drv, InputInfoPtr pInfo, int flags)
 	if (!str) {
 		xf86Msg(X_ERROR, "%s: No Device specified in FPIT module config.\n", pInfo->name);
 		return BadValue;
+	} else {
+		pInfo->fd = xf86OpenSerial(pInfo->options);
+		if (pInfo->fd < 0) {
+		    xf86Msg(X_ERROR, "%s: Unable to open Fpit touchscreen device '%s'", pInfo->name, str);
+		    return BadValue;
+		}
+		xf86CloseSerial(pInfo->fd);
+		pInfo->fd = -1;
 	}
 	priv->fpitDev = strdup(str);
 	priv->screen_no = xf86SetIntOption(pInfo->options, "ScreenNo", 0);
