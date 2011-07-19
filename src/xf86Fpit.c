@@ -542,7 +542,6 @@ static int xf86FpitAllocate(InputDriverPtr drv, InputInfoPtr pInfo)
 static void xf86FpitUninit(InputDriverPtr drv, InputInfoPtr pInfo, int flags)
 {
 	FpitPrivatePtr priv = (FpitPrivatePtr) pInfo->private;
-	xf86FpitControl(pInfo->dev, DEVICE_OFF);
 	free(priv->fpitDev);
 	free(priv);
 	pInfo->private = NULL;
