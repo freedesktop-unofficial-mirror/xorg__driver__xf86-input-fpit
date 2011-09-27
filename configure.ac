@@ -71,4 +71,12 @@ PKG_CHECK_MODULES(XORG, [xorg-server >= 1.10.0] xproto $REQUIRED_MODULES)
 DRIVER_NAME=fpit
 AC_SUBST([DRIVER_NAME])
 
+AC_MSG_WARN([
+    ***************************************************************************
+    This driver is umaintained, untested and may not build.
+    Any fixes to this driver will only be applied if you have a device and you
+    can test patches. See
+    http://lists.freedesktop.org/archives/xorg-devel/2011-September/025336.html
+    ***************************************************************************])
+
 AC_OUTPUT([Makefile src/Makefile man/Makefile conf/Makefile])
