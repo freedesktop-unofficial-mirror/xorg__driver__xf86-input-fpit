@@ -527,7 +527,6 @@ static int xf86FpitAllocate(InputDriverPtr drv, InputInfoPtr pInfo)
 	priv->fpitOldProximity = 0;
 	priv->fpitIndex = 0;
 	priv->fpitPassive = 0;
-	pInfo->flags = 0 /* XI86_NO_OPEN_ON_INIT */ ;
 	pInfo->device_control = xf86FpitControl;
 	pInfo->read_input = xf86FpitReadInput;
 	pInfo->control_proc = NULL;
